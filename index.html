@@ -1,0 +1,758 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>A7 Squad Stats</title>
+  <!-- Bootstrap 5 CSS -->
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet" integrity="sha384-T3c6CoIi6uLrA9TneNEoa7RxnatzjcDSCmG1MXxSR1GAsXEV/Dwwykc2MPK8M2HN" crossorigin="anonymous">
+  <!-- Custom Font -->
+  <link href="https://fonts.googleapis.com/css2?family=Rajdhani:wght@400;500;700&display=swap" rel="stylesheet">
+  <!-- Chart.js for K/D Graph -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@3.9.1/dist/chart.min.js"></script>
+  <style>
+    body {
+      font-family: 'Rajdhani', sans-serif;
+      background: url('https://images.unsplash.com/photo-1600585154340-be6161a56a0c?ixlib=rb-4.0.3&auto=format&fit=crop&w=1350&q=80') no-repeat center center fixed;
+      background-size: cover;
+      color: #FFFFFF;
+      overflow-x: hidden;
+      min-height: 100vh;
+      margin: 0;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      position: relative;
+    }
+    body::before {
+      content: '';
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background: rgba(0, 0, 0, 0.7);
+      backdrop-filter: blur(8px);
+      -webkit-backdrop-filter: blur(8px);
+      z-index: -1;
+    }
+    /* Loading Screen */
+    #loading-screen {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100vh;
+      background: rgba(0, 0, 0, 0.9);
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      z-index: 1000;
+      transition: opacity 0.5s ease;
+    }
+    #loading-logo {
+      width: 200px;
+      height: auto;
+      animation: swipeAndScale 2s ease-in-out infinite;
+    }
+    @keyframes swipeAndScale {
+      0% { transform: translateX(-100%) scale(0.5); opacity: 0; }
+      25% { transform: translateX(0) scale(1.5); opacity: 1; }
+      50% { transform: translateX(0) scale(1); opacity: 1; }
+      75% { transform: translateX(0) scale(0.8); opacity: 1; }
+      100% { transform: translateX(100%) scale(0.5); opacity: 0; }
+    }
+    /* Main Content (Leaderboard) */
+    #main-content {
+      display: none;
+      flex-direction: column;
+      align-items: center;
+      width: 100%;
+      padding: 20px;
+      opacity: 0;
+      transition: opacity 0.5s ease;
+      min-height: 100vh;
+    }
+    #main-content.active {
+      display: flex;
+      opacity: 1;
+    }
+    .top-killers {
+      display: flex;
+      justify-content: center;
+      gap: 30px;
+      margin-bottom: 20px;
+      width: 100%;
+      max-width: 900px;
+      flex-shrink: 0;
+    }
+    .top-killer-card {
+      background: rgba(0, 0, 0, 0.8);
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      border-radius: 10px;
+      padding: 15px;
+      text-align: center;
+      transition: transform 0.2s;
+      cursor: pointer;
+      width: 200px;
+      height: 150px;
+      flex-shrink: 0;
+    }
+    .top-killer-card:hover {
+      transform: scale(1.05);
+    }
+    .top-killer-card.center {
+      background: rgba(255, 193, 7, 0.2);
+      border-color: #FFC107;
+      transform: scale(1.1);
+    }
+    .top-killer-card.center:hover {
+      transform: scale(1.15);
+    }
+    .top-killer-card h3 {
+      font-size: 1.5em;
+      margin: 0;
+      color: #FFFFFF;
+    }
+    .top-killer-card.center h3 {
+      color: #FFC107;
+    }
+    .top-killer-card p {
+      margin: 5px 0 0;
+      font-size: 1em;
+      color: #B0BEC5;
+    }
+    .search-bar {
+      margin-bottom: 20px;
+      width: 100%;
+      max-width: 900px;
+      flex-shrink: 0;
+    }
+    .search-bar input {
+      width: 100%;
+      padding: 10px;
+      background: rgba(0, 0, 0, 0.8);
+      border: 1px solid rgba(255, 255, 255, 0.3);
+      border-radius: 10px;
+      color: #FFFFFF;
+      font-family: 'Rajdhani', sans-serif;
+      font-size: 1em;
+    }
+    .search-bar input::placeholder {
+      color: #B0BEC5;
+      font-size: 1em;
+    }
+    .leaderboard {
+      background: rgba(0, 0, 0, 0.8);
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      border-radius: 10px;
+      padding: 10px;
+      width: 100%;
+      max-width: 900px;
+      max-height: 60vh;
+      overflow-y: auto;
+      overflow-x: hidden;
+      position: relative;
+      flex-grow: 1;
+    }
+    .leaderboard-table {
+      width: 100%;
+      border-collapse: collapse;
+    }
+    .leaderboard-table th, .leaderboard-table td {
+      padding: 10px;
+      text-align: left;
+      font-size: 1em;
+      color: #B0BEC5;
+    }
+    .leaderboard-table th {
+      background: rgba(0, 0, 0, 0.5);
+      position: sticky;
+      top: 0;
+      z-index: 2;
+      text-transform: uppercase;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+    }
+    .leaderboard-table tr {
+      transition: transform 0.2s, background 0.2s;
+      cursor: pointer;
+    }
+    .leaderboard-table tr:hover {
+      background: rgba(255, 255, 255, 0.05);
+      transform: scale(1.02);
+    }
+    .leaderboard-table tr.you {
+      background: rgba(255, 193, 7, 0.2);
+    }
+    .leaderboard-table tr.you td {
+      color: #FFC107;
+    }
+    .leaderboard-table td strong {
+      color: #FFFFFF;
+    }
+    /* User Page */
+    #user-page {
+      display: none;
+      flex-direction: column;
+      align-items: center;
+      width: 100%;
+      padding: 20px;
+      opacity: 0;
+      transition: opacity 0.5s ease;
+      min-height: 100vh;
+    }
+    #user-page.active {
+      display: flex;
+      opacity: 1;
+    }
+    .user-content {
+      background: rgba(0, 0, 0, 0.9);
+      border: 1px solid rgba(255, 255, 255, 0.3);
+      border-radius: 10px;
+      padding: 20px;
+      width: 100%;
+      max-width: 1000px;
+      display: flex;
+      gap: 20px;
+      flex-grow: 1;
+    }
+    .character-section {
+      width: 50%;
+      height: 400px;
+      background: rgba(0, 0, 0, 0.5);
+      border: 1px solid rgba(255, 255, 255, 0.2);
+      border-radius: 10px;
+      position: relative;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      flex-shrink: 0;
+    }
+    .loading-indicator {
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      color: #FFC107;
+      font-size: 1.2em;
+      display: none;
+    }
+    .stats-section {
+      width: 50%;
+      display: flex;
+      flex-direction: column;
+      gap: 20px;
+      flex-grow: 1;
+    }
+    .stats-header {
+      display: flex;
+      align-items: center;
+      gap: 15px;
+    }
+    .stats-header img {
+      width: 60px;
+      height: 60px;
+      border: 2px solid #FFC107;
+      border-radius: 10px;
+    }
+    .stats-header h2 {
+      font-size: 2em;
+      font-weight: 700;
+      margin: 0;
+    }
+    .stats-header span {
+      font-size: 1.2em;
+      color: #B0BEC5;
+    }
+    .kd-graph {
+      background: rgba(0, 0, 0, 0.5);
+      padding: 10px;
+      border: 1px solid rgba(255, 255, 255, 0.2);
+      border-radius: 10px;
+      flex-grow: 1;
+    }
+    .stats-list {
+      list-style: none;
+      padding: 0;
+      font-size: 1em;
+    }
+    .stats-list li {
+      display: flex;
+      justify-content: space-between;
+      padding: 10px 0;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+    }
+    .stats-list li span:first-child {
+      color: #B0BEC5;
+      text-transform: uppercase;
+    }
+    .back-button {
+      margin-top: 15px;
+      background: transparent;
+      color: #FFFFFF;
+      border: 1px solid rgba(255, 255, 255, 0.3);
+      padding: 10px 20px;
+      font-size: 1em;
+      border-radius: 10px;
+      cursor: pointer;
+      transition: all 0.3s;
+    }
+    .back-button:hover {
+      background: #FFC107;
+      color: #000;
+      border-color: #FFC107;
+    }
+    /* Custom Cursor for Game-Like Movement */
+    .custom-cursor {
+      position: fixed;
+      width: 20px;
+      height: 20px;
+      border: 2px solid #FFC107;
+      border-radius: 50%;
+      pointer-events: none;
+      z-index: 9999;
+      background: rgba(255, 193, 7, 0.2);
+      mix-blend-mode: difference;
+      transition: transform 0.1s;
+    }
+    .custom-cursor.trail {
+      width: 10px;
+      height: 10px;
+      background: rgba(255, 193, 7, 0.1);
+      opacity: 0.5;
+    }
+    /* Media Queries for Responsiveness */
+    @media (max-height: 800px) {
+      .top-killer-card {
+        padding: 10px;
+        width: 150px;
+        height: 120px;
+      }
+      .top-killer-card h3 {
+        font-size: 1.2em;
+      }
+      .top-killer-card p {
+        font-size: 0.9em;
+        margin: 3px 0 0;
+      }
+      .search-bar input {
+        padding: 8px;
+        font-size: 0.9em;
+      }
+      .leaderboard {
+        max-height: 50vh;
+        padding: 8px;
+      }
+      .leaderboard-table th, .leaderboard-table td {
+        padding: 8px;
+        font-size: 0.9em;
+      }
+      .user-content {
+        padding: 15px;
+        max-width: 800px;
+      }
+      .character-section {
+        height: 300px;
+      }
+      .stats-header img {
+        width: 50px;
+        height: 50px;
+      }
+      .stats-header h2 {
+        font-size: 1.5em;
+      }
+      .stats-header span {
+        font-size: 1em;
+      }
+      .kd-graph {
+        padding: 8px;
+      }
+      .stats-list {
+        font-size: 0.9em;
+      }
+      .stats-list li {
+        padding: 8px 0;
+      }
+      .back-button {
+        margin-top: 10px;
+        padding: 8px 15px;
+        font-size: 0.9em;
+      }
+    }
+  </style>
+</head>
+<body>
+  <!-- Loading Screen -->
+  <div id="loading-screen">
+    <img id="loading-logo" src="https://stats.a7community.com/images/A7.png" alt="A7 Logo">
+  </div>
+
+  <!-- Main Content (Leaderboard) -->
+  <div id="main-content">
+    <div class="top-killers">
+      <div class="top-killer-card" id="top-killer-2" onclick="openUserPageForTopKiller(2)">
+        <h3>#2</h3>
+        <p id="top-killer-2-name">-</p>
+        <p id="top-killer-2-kills">-</p>
+      </div>
+      <div class="top-killer-card center" id="top-killer-1" onclick="openUserPageForTopKiller(1)">
+        <h3>#1</h3>
+        <p id="top-killer-1-name">-</p>
+        <p id="top-killer-1-kills">-</p>
+      </div>
+      <div class="top-killer-card" id="top-killer-3" onclick="openUserPageForTopKiller(3)">
+        <h3>#3</h3>
+        <p id="top-killer-3-name">-</p>
+        <p id="top-killer-3-kills">-</p>
+      </div>
+    </div>
+    <div class="search-bar">
+      <input type="text" id="player-search" placeholder="Search Players..." onkeyup="handleSearch()">
+    </div>
+    <div class="leaderboard">
+      <table class="leaderboard-table">
+        <thead>
+          <tr>
+            <th>Rank</th>
+            <th>Name</th>
+            <th>Kills</th>
+            <th>Deaths</th>
+            <th>K/D</th>
+            <th>Team Kills</th>
+          </tr>
+        </thead>
+        <tbody id="player-list"></tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- User Page -->
+  <div id="user-page">
+    <div class="user-content">
+      <div class="character-section">
+        <canvas id="character-canvas" width="500" height="400"></canvas>
+        <div id="loading-indicator" class="loading-indicator">Loading Model...</div>
+      </div>
+      <div class="stats-section">
+        <div class="stats-header">
+          <img src="https://stats.a7community.com/images/A7.png" alt="Clan Logo">
+          <div>
+            <h2 id="user-name"></h2>
+            <span id="user-clan"></span>
+          </div>
+          <span id="user-level" class="ms-auto">60</span>
+        </div>
+        <div class="kd-graph">
+          <canvas id="kd-chart"></canvas>
+        </div>
+        <ul id="user-stats-list" class="stats-list"></ul>
+      </div>
+    </div>
+    <button class="back-button" onclick="goBack()">Back to Leaderboard</button>
+  </div>
+
+  <!-- Custom Cursor -->
+  <div class="custom-cursor"></div>
+  <div class="custom-cursor trail"></div>
+
+  <!-- Bootstrap 5 JS Bundle -->
+  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js" integrity="sha384-C6RzsynM9kWDrMNeT87bh95OGNyZPhcTNXj1NW7RuBCsyN/o0jlpcV8Qyq46cDfL" crossorigin="anonymous"></script>
+  <!-- Three.js -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r134/three.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/three@0.134.0/examples/js/loaders/GLTFLoader.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/three@0.134.0/examples/js/controls/OrbitControls.js"></script>
+  <script>
+    let players = [];
+    let filteredPlayers = [];
+    let cursor = document.querySelector('.custom-cursor');
+    let trail = document.querySelector('.custom-cursor.trail');
+    let currentScene = null;
+    let currentRenderer = null;
+    let currentChart = null;
+    let searchTimeout = null;
+
+    // Loading Animation and Transition
+    window.addEventListener('load', () => {
+      setTimeout(() => {
+        document.getElementById('loading-screen').style.opacity = '0';
+        setTimeout(() => {
+          document.getElementById('loading-screen').style.display = 'none';
+          document.getElementById('main-content').classList.add('active');
+          fetch('/api/players')
+            .then(response => {
+              if (!response.ok) throw new Error('Network response was not ok');
+              return response.json();
+            })
+            .then(data => {
+              players = data;
+              filteredPlayers = [...players];
+              renderTopKillers();
+              renderPlayerList();
+            })
+            .catch(error => console.error('Error fetching players:', error));
+        }, 500);
+      }, 2500); // Total animation duration + fade out
+    });
+
+    // Render top killers
+    function renderTopKillers() {
+      const sortedPlayers = [...players].sort((a, b) => b.kills - a.kills);
+      const topThree = sortedPlayers.slice(0, 3);
+
+      if (topThree[0]) {
+        document.getElementById('top-killer-1-name').textContent = topThree[0].name;
+        document.getElementById('top-killer-1-kills').textContent = `Kills: ${topThree[0].kills}`;
+      }
+      if (topThree[1]) {
+        document.getElementById('top-killer-2-name').textContent = topThree[1].name;
+        document.getElementById('top-killer-2-kills').textContent = `Kills: ${topThree[1].kills}`;
+      }
+      if (topThree[2]) {
+        document.getElementById('top-killer-3-name').textContent = topThree[2].name;
+        document.getElementById('top-killer-3-kills').textContent = `Kills: ${topThree[2].kills}`;
+      }
+    }
+
+    // Open user page for top killers
+    function openUserPageForTopKiller(position) {
+      const sortedPlayers = [...players].sort((a, b) => b.kills - a.kills);
+      const topThree = sortedPlayers.slice(0, 3);
+      const player = topThree[position - 1];
+      if (player) {
+        openUserPage(player.name);
+      }
+    }
+
+    // Render player list
+    function renderPlayerList() {
+      const playerList = document.getElementById('player-list');
+      playerList.innerHTML = filteredPlayers.map(player => `
+        <tr class="${player.isYou ? 'you' : ''}" onclick="openUserPage('${player.name}')">
+          <td>${player.position}</td>
+          <td>${player.name}</td>
+          <td><strong>${player.kills}</strong></td>
+          <td>${player.deaths}</td>
+          <td>${player.kdRatio}</td>
+          <td>${player.teamKills}</td>
+        </tr>
+      `).join('');
+    }
+
+    // Handle search with "starts with" matching
+    function handleSearch() {
+      clearTimeout(searchTimeout);
+      searchTimeout = setTimeout(() => {
+        const searchTerm = document.getElementById('player-search').value.toLowerCase().replace(/\s+/g, '');
+        if (searchTerm.length > 0) {
+          // Filter players based on "starts with" match
+          filteredPlayers = players.filter(player => {
+            const normalizedName = player.name.toLowerCase().replace(/\s+/g, '');
+            return normalizedName.startsWith(searchTerm);
+          });
+        } else {
+          filteredPlayers = [...players];
+        }
+        renderPlayerList();
+      }, 300); // Delay to allow typing to complete
+    }
+
+    // Open user page
+    function openUserPage(playerName) {
+      fetch(`/api/players/${playerName}`)
+        .then(response => {
+          if (!response.ok) throw new Error('Network response was not ok');
+          return response.json();
+        })
+        .then(player => {
+          document.getElementById('user-page').classList.add('active');
+          document.getElementById('main-content').classList.remove('active');
+          document.getElementById('user-name').textContent = player.name.toUpperCase();
+          document.getElementById('user-clan').textContent = 'A7 Squad';
+          document.getElementById('user-level').textContent = '60';
+
+          const statsList = document.getElementById('user-stats-list');
+          statsList.innerHTML = `
+            <li><span>K/D Ratio</span><span>${player.kdRatio}</span></li>
+            <li><span>Preferred Kit</span><span>${player.stats.preferredKit.toUpperCase()}</span></li>
+            <li><span>Current Streak</span><span>0</span></li>
+            <li><span>Wins</span><span>${player.stats.wins}</span></li>
+            <li><span>Games Played</span><span>${player.stats.gamesPlayed}</span></li>
+            <li><span>W/L Ratio</span><span>${player.stats.wlRatio}</span></li>
+            <li><span>Time Played</span><span>${player.stats.timePlayed}</span></li>
+          `;
+
+          // Set up Three.js scene
+          const canvas = document.getElementById('character-canvas');
+          const scene = new THREE.Scene();
+          const camera = new THREE.PerspectiveCamera(75, canvas.width / canvas.height, 0.1, 1000);
+          const renderer = new THREE.WebGLRenderer({ canvas: canvas, alpha: true });
+          renderer.setSize(canvas.width, canvas.height);
+
+          // Add lighting
+          const ambientLight = new THREE.AmbientLight(0x404040, 2);
+          scene.add(ambientLight);
+          const directionalLight = new THREE.DirectionalLight(0xffffff, 1);
+          directionalLight.position.set(5, 5, 5).normalize();
+          scene.add(directionalLight);
+
+          // Add orbit controls
+          const controls = new THREE.OrbitControls(camera, renderer.domElement);
+          controls.enableDamping = true;
+          controls.dampingFactor = 0.05;
+          controls.screenSpacePanning = false;
+          controls.minDistance = 2;
+          controls.maxDistance = 10;
+
+          // Show loading indicator
+          const loadingIndicator = document.getElementById('loading-indicator');
+          loadingIndicator.style.display = 'block';
+
+          // Load the appropriate 3D model based on preferredKit
+          const loader = new THREE.GLTFLoader();
+          let modelPath;
+          switch (player.stats.preferredKit) {
+            case 'Sapper':
+              modelPath = '/models/insurgent_sapper.glb';
+              break;
+            case 'Fighter':
+              modelPath = '/models/insurgent_fighter.glb';
+              break;
+            case 'Grenadier':
+              modelPath = '/models/insurgent_grenadier.glb';
+              break;
+            case 'Sniper':
+              modelPath = '/models/insurgent_sniper.glb';
+              break;
+            case 'Medic':
+              modelPath = '/models/insurgent_medic.glb';
+              break;
+            default:
+              modelPath = '/models/insurgent_sapper.glb';
+          }
+
+          loader.load(
+            modelPath,
+            (gltf) => {
+              const model = gltf.scene;
+              scene.add(model);
+
+              const box = new THREE.Box3().setFromObject(model);
+              const center = box.getCenter(new THREE.Vector3());
+              const size = box.getSize(new THREE.Vector3());
+              const maxDim = Math.max(size.x, size.y, size.z);
+              const scale = 2 / maxDim;
+              model.scale.set(scale, scale, scale);
+              model.position.sub(center.multiplyScalar(scale));
+
+              camera.position.z = 3;
+              camera.lookAt(0, 0, 0);
+
+              loadingIndicator.style.display = 'none';
+            },
+            (xhr) => {
+              console.log((xhr.loaded / xhr.total * 100) + '% loaded');
+            },
+            (error) => {
+              console.error('Error loading model:', error);
+              const geometry = new THREE.SphereGeometry(0.5, 32, 32);
+              const material = new THREE.MeshBasicMaterial({ color: 0x666666 });
+              const sphere = new THREE.Mesh(geometry, material);
+              scene.add(sphere);
+              camera.position.z = 3;
+              loadingIndicator.style.display = 'none';
+            }
+          );
+
+          // Animation loop
+          function animate() {
+            requestAnimationFrame(animate);
+            controls.update();
+            renderer.render(scene, camera);
+          }
+          animate();
+
+          // Clean up previous scene and chart if they exist
+          if (currentScene) currentScene.clear();
+          if (currentRenderer) currentRenderer.dispose();
+          if (currentChart) currentChart.destroy();
+
+          // K/D Ratio Graph
+          const kdChartCanvas = document.getElementById('kd-chart');
+          currentChart = new Chart(kdChartCanvas, {
+            type: 'line',
+            data: {
+              labels: ['Game 1', 'Game 2', 'Game 3', 'Game 4', 'Game 5'],
+              datasets: [{
+                label: 'K/D Ratio',
+                data: player.stats.kdHistory,
+                borderColor: '#FF0000',
+                backgroundColor: 'rgba(255, 0, 0, 0.2)',
+                borderWidth: 2,
+                fill: false,
+                tension: 0.3,
+                pointBackgroundColor: '#FFFFFF',
+                pointBorderColor: '#FF0000',
+                pointRadius: 4,
+              }]
+            },
+            options: {
+              scales: {
+                y: {
+                  beginAtZero: true,
+                  max: 2.5,
+                  title: { display: true, text: 'K/D Ratio', color: '#B0BEC5', font: { size: 12 } },
+                  ticks: { color: '#B0BEC5' },
+                  grid: { color: 'rgba(255, 255, 255, 0.1)' }
+                },
+                x: {
+                  title: { display: true, text: 'Last 5 Games', color: '#B0BEC5', font: { size: 12 } },
+                  ticks: { color: '#B0BEC5' },
+                  grid: { color: 'rgba(255, 255, 255, 0.1)' }
+                }
+              },
+              plugins: {
+                legend: { display: false },
+                title: {
+                  display: true,
+                  text: 'Kill / Death Ratio (Last 5 Games)',
+                  color: '#FFFFFF',
+                  font: { size: 14, weight: 'bold' }
+                }
+              }
+            }
+          });
+
+          currentScene = scene;
+          currentRenderer = renderer;
+        })
+        .catch(error => console.error('Error fetching player stats:', error));
+    }
+
+    // Go back to leaderboard
+    function goBack() {
+      document.getElementById('user-page').classList.remove('active');
+      document.getElementById('main-content').classList.add('active');
+      if (currentScene) currentScene.clear();
+      if (currentRenderer) currentRenderer.dispose();
+      if (currentChart) currentChart.destroy();
+      currentScene = null;
+      currentRenderer = null;
+      currentChart = null;
+      const canvas = document.getElementById('character-canvas');
+      canvas.getContext('webgl').clear(canvas.getContext('webgl').COLOR_BUFFER_BIT | canvas.getContext('webgl').DEPTH_BUFFER_BIT);
+    }
+
+    // Custom Cursor Movement
+    document.addEventListener('mousemove', (e) => {
+      const x = e.clientX;
+      const y = e.clientY;
+      cursor.style.left = `${x - 10}px`;
+      cursor.style.top = `${y - 10}px`;
+      trail.style.left = `${x - 5}px`;
+      trail.style.top = `${y - 5}px`;
+      cursor.style.transform = 'scale(1.2)';
+      setTimeout(() => cursor.style.transform = 'scale(1)', 100);
+    });
+  </script>
+</body>
+</html>
